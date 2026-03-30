@@ -1,0 +1,86 @@
+groups:
+  - name: sre-platform-alerts
+    interval: 30s
+    rules:
+
+      # ── Traffic & Errors ────────────────────────────────────────────────────
+
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{status_code=~"5.."}[2m]))
+            /
+            sum(rate(http_requests_total[2m]))
+          ) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+          team: sre
+        annotations:
+          summary: "High HTTP error rate detected"
+          description: >
+            Error rate is {{ $value | humanizePercentage }} over the last 2 minutes.
+            Threshold: 5%. Check /chaos/status for active chaos modes.
+
+      # ── Latency ────────────────────────────────────────────────────────────
+
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(http_request_duration_seconds_bucket[2m])) by (le, endpoint)
+          ) > 2
+        for: 2m
+        labels:
+          severity: warning
+          team: sre
+        annotations:
+          summary: "High p99 latency on {{ $labels.endpoint }}"
+          description: >
+            p99 latency for {{ $labels.endpoint }} is {{ $value | humanizeDuration }}.
+            Threshold: 2s. Possible latency spike chaos mode active.
+
+      # ── Memory ─────────────────────────────────────────────────────────────
+
+      - alert: MemoryLeakDetected
+        expr: |
+          (
+            memory_usage_bytes
+            - memory_usage_bytes offset 5m
+          ) > 50 * 1024 * 1024
+        for: 1m
+        labels:
+          severity: critical
+          team: sre
+        annotations:
+          summary: "Memory leak detected — process grew >50MB in 5 minutes"
+          description: >
+            Process memory grew by {{ $value | humanize1024 }}B in the last 5 minutes.
+            This likely indicates the memory-leak chaos mode is active.
+
+      # ── Chaos Modes ────────────────────────────────────────────────────────
+
+      - alert: ChaosModeActive
+        expr: active_chaos_modes > 0
+        for: 0m
+        labels:
+          severity: info
+          team: sre
+        annotations:
+          summary: "Chaos mode '{{ $labels.mode }}' is active"
+          description: >
+            The chaos mode '{{ $labels.mode }}' is currently injecting failures.
+            Use DELETE /chaos/reset to stop all chaos modes.
+
+      # ── Availability ───────────────────────────────────────────────────────
+
+      - alert: ServiceDown
+        expr: up{job="sre-platform-app"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: sre
+        annotations:
+          summary: "SRE platform app is down"
+          description: >
+            The application target {{ $labels.instance }} has been unreachable
+            for more than 1 minute. Check Docker container status.

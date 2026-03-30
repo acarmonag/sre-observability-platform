@@ -1,0 +1,67 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Dedicated job for the SRE platform app
+  - job_name: sre-platform
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: label
+            values: ["com.docker.compose.service=app"]
+    relabel_configs:
+      - replacement: "sre-platform"
+        target_label: "job"
+      - source_labels: ["__meta_docker_container_name"]
+        regex: "/(.*)"
+        target_label: "container"
+
+    pipeline_stages:
+      # Parse the JSON emitted by python-json-logger
+      - json:
+          expressions:
+            level: level
+            timestamp: timestamp
+            request_id: request_id
+            method: method
+            path: path
+            status_code: status_code
+            duration_ms: duration_ms
+      # Promote the extracted 'level' field to a Loki stream label
+      - labels:
+          level: level
+      # Parse timestamp from the JSON field
+      - timestamp:
+          source: timestamp
+          format: "2006-01-02T15:04:05"
+          fallback_formats:
+            - "2006-01-02T15:04:05.999999999Z07:00"
+
+  # Catch-all job for all other containers
+  - job_name: docker-containers
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: status
+            values: ["running"]
+    relabel_configs:
+      - source_labels: ["__meta_docker_container_name"]
+        regex: "/(.*)"
+        target_label: "container"
+      - source_labels: ["__meta_docker_container_label_com_docker_compose_service"]
+        target_label: "compose_service"
+      - replacement: "docker-containers"
+        target_label: "job"
+      # Drop the app container from this job — it's handled by sre-platform above
+      - source_labels: ["__meta_docker_container_label_com_docker_compose_service"]
+        regex: "app"
+        action: drop
