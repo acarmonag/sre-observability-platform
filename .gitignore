@@ -1,0 +1,16 @@
+# Docker volumes data
+grafana-data/
+prometheus-data/
+loki-data/
+*.db
+__pycache__/
+*.pyc
+.env
+# Docker volumes data
+grafana-data/
+prometheus-data/
+loki-data/
+*.db
+__pycache__/
+*.pyc
+.env
