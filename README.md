@@ -15,13 +15,13 @@ A production-grade FastAPI microservice with full **LGTM stack** observability a
 │  │   app:8000   │            │   :9090         │                    │
 │  │              │  traces    └────────┬────────┘                    │
 │  │  /orders     │ ─────────► ┌────────▼────────┐  dashboards        │
-│  │  /products   │            │     Grafana      │ ◄──────────       │
-│  │  /chaos/*    │  logs      │     :3000        │                   │
+│  │  /products   │            │     Grafana     │ ◄──────────        │
+│  │  /chaos/*    │  logs      │     :3000       │                    │
 │  │  /health     │ ─────────► └────────┬────────┘                    │
 │  │  /metrics    │  (stdout)           │ queries                     │
 │  └──────┬───────┘            ┌────────▼────────┐                    │
-│         │                    │      Loki        │                   │
-│         │ OTLP gRPC          │      :3100       │                   │
+│         │                    │      Loki       │                    │
+│         │ OTLP gRPC          │      :3100      │                    │
 │         │                    └─────────────────┘                    │
 │         ▼                    ┌─────────────────┐                    │
 │  ┌──────────────┐            │    Promtail     │                    │
